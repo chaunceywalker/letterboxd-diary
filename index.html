@@ -21,11 +21,13 @@ body {
   gap:16px;
   padding:14px 0;
   border-bottom:1px solid #2c3440;
+  align-items:flex-start;
 }
 
 .poster {
   width:70px;
   border-radius:6px;
+  flex-shrink:0;
 }
 
 .details {
@@ -56,24 +58,30 @@ body {
 <script>
 const username = "chaunceywalker";
 
+// Use a CORS proxy to fetch the diary page
 fetch(`https://corsproxy.io/?https://letterboxd.com/${username}/films/diary/`)
   .then(res => res.text())
   .then(html => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    const rows = doc.querySelectorAll(".diary-entry-row");
+
+    // Select each diary entry
+    const rows = doc.querySelectorAll("li.diary-entry");
 
     const container = document.getElementById("diary");
 
     rows.forEach((row, i) => {
-      if (i >= 20) return;
+      if (i >= 20) return; // limit number of entries
 
-      const poster = row.querySelector(".film-poster img")?.src;
-      const title = row.querySelector(".headline-3 a")?.textContent;
-      const year = row.querySelector(".metadata a")?.textContent;
-      const date = row.querySelector(".td-day a")?.textContent;
+      // Updated selectors
+      const poster = row.querySelector("img.poster")?.src;
+      const title = row.querySelector(".film-title")?.textContent?.trim();
+      const year = row.querySelector(".film-title-year")?.textContent?.trim();
+      const date = row.querySelector(".date")?.textContent?.trim();
       const ratingClass = row.querySelector(".rating")?.className || "";
-      const rewatch = row.innerHTML.includes("icon-rewatch");
+      const hearted = row.querySelector(".icon-heart") ? true : false;
+      const review = row.querySelector(".icon-review") ? true : false;
+      const rewatch = row.querySelector(".icon-rewatch") ? true : false;
 
       let stars = "";
       const match = ratingClass.match(/rated-(\d+)/);
@@ -85,12 +93,14 @@ fetch(`https://corsproxy.io/?https://letterboxd.com/${username}/films/diary/`)
       entry.className = "entry";
 
       entry.innerHTML = `
-        <img class="poster" src="${poster}">
+        <img class="poster" src="${poster || ''}">
         <div class="details">
-          <div class="title">${title} (${year})</div>
+          <div class="title">${title || "Untitled"}${year ? " ("+year+")" : ""}</div>
           <div class="meta">
-            Watched ${date}
-            ${rewatch ? " • Rewatch" : ""}
+            Watched ${date || "Unknown"} 
+            ${rewatch ? "• Rewatch" : ""}
+            ${hearted ? "• ❤️" : ""}
+            ${review ? "• 📝" : ""}
           </div>
           <div class="rating">${stars}</div>
         </div>
@@ -98,6 +108,10 @@ fetch(`https://corsproxy.io/?https://letterboxd.com/${username}/films/diary/`)
 
       container.appendChild(entry);
     });
+  })
+  .catch(err => {
+    document.getElementById("diary").innerHTML = "<p style='color:white;'>Unable to load diary.</p>";
+    console.error(err);
   });
 </script>
 
