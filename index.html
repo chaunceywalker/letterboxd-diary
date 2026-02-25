@@ -1,118 +1,141 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Letterboxd Diary</title>
-
+<title>Letterboxd Last 4 Films</title>
 <style>
 body {
-  margin:0;
-  background:#14181c;
-  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  color:white;
+  margin: 0;
+  background: #14181c;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  color: white;
 }
 
-.container {
-  padding:20px;
+#widget {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 20px;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: grab;
 }
 
-.entry {
-  display:flex;
-  gap:16px;
-  padding:14px 0;
-  border-bottom:1px solid #2c3440;
-  align-items:flex-start;
+#widget-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.poster {
-  width:70px;
-  border-radius:6px;
-  flex-shrink:0;
+#widget-header img {
+  width: 20px;
+  margin-right: 8px;
 }
 
-.details {
-  flex:1;
+#widget-header span {
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 0.5px;
 }
 
-.title {
-  font-weight:600;
+#film-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
 }
 
-.meta {
-  font-size:13px;
-  color:#9ab;
-  margin-top:4px;
+#film-row::-webkit-scrollbar { display: none; }
+#film-row { -ms-overflow-style: none; scrollbar-width: none; }
+
+.film {
+  flex: 0 0 auto;
+  width: clamp(70px, 22%, 120px);
+  text-align: center;
+  scroll-snap-align: start;
 }
 
-.rating {
-  color:#00e054;
-  margin-top:6px;
-  font-size:14px;
+.film img {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+.stars {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #00e054;
 }
 </style>
 </head>
-
 <body>
-<div class="container" id="diary"></div>
+
+<div id="widget">
+  <div id="widget-header">
+    <img src="https://a.ltrbxd.com/logos/letterboxd-decal-dots-neg-rgb.svg" alt="Letterboxd">
+    <span>Recently Watched</span>
+  </div>
+  <div id="film-row"></div>
+</div>
 
 <script>
-const username = "chaunceywalker";
+const username = "chaunceywalker"; // <-- Replace with your Letterboxd username
+const rssUrl = `https://letterboxd.com/${username}/rss/`;
 
-// Use a CORS proxy to fetch the diary page
-fetch(`https://corsproxy.io/?https://letterboxd.com/${username}/films/diary/`)
-  .then(res => res.text())
-  .then(html => {
+// Helper to convert rating to stars
+function stars(rating) {
+  if (!rating) return "";
+  return "★".repeat(Math.round(rating / 2));
+}
+
+// Fetch RSS via CORS proxy
+fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`)
+  .then(res => res.json())
+  .then(data => {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
+    const xml = parser.parseFromString(data.contents, "text/xml");
+    const items = xml.querySelectorAll("item");
+    const container = document.getElementById("film-row");
 
-    // Select each diary entry
-    const rows = doc.querySelectorAll("li.diary-entry");
-
-    const container = document.getElementById("diary");
-
-    rows.forEach((row, i) => {
-      if (i >= 20) return; // limit number of entries
-
-      // Updated selectors
-      const poster = row.querySelector("img.poster")?.src;
-      const title = row.querySelector(".film-title")?.textContent?.trim();
-      const year = row.querySelector(".film-title-year")?.textContent?.trim();
-      const date = row.querySelector(".date")?.textContent?.trim();
-      const ratingClass = row.querySelector(".rating")?.className || "";
-      const hearted = row.querySelector(".icon-heart") ? true : false;
-      const review = row.querySelector(".icon-review") ? true : false;
-      const rewatch = row.querySelector(".icon-rewatch") ? true : false;
-
-      let stars = "";
-      const match = ratingClass.match(/rated-(\d+)/);
-      if (match) {
-        stars = "★".repeat(parseInt(match[1]) / 2);
-      }
-
-      const entry = document.createElement("div");
-      entry.className = "entry";
-
-      entry.innerHTML = `
-        <img class="poster" src="${poster || ''}">
-        <div class="details">
-          <div class="title">${title || "Untitled"}${year ? " ("+year+")" : ""}</div>
-          <div class="meta">
-            Watched ${date || "Unknown"} 
-            ${rewatch ? "• Rewatch" : ""}
-            ${hearted ? "• ❤️" : ""}
-            ${review ? "• 📝" : ""}
-          </div>
-          <div class="rating">${stars}</div>
-        </div>
+    items.forEach((item, i) => {
+      if (i >= 4) return; // only last 4 films
+      const poster = item.querySelector("letterboxd\\:filmPoster")?.textContent;
+      const rating = item.querySelector("letterboxd\\:memberRating")?.textContent;
+      const filmDiv = document.createElement("div");
+      filmDiv.className = "film";
+      filmDiv.innerHTML = `
+        <img src="${poster}" alt="">
+        <div class="stars">${stars(rating)}</div>
       `;
-
-      container.appendChild(entry);
+      container.appendChild(filmDiv);
     });
   })
-  .catch(err => {
-    document.getElementById("diary").innerHTML = "<p style='color:white;'>Unable to load diary.</p>";
-    console.error(err);
-  });
+  .catch(err => console.error("Failed to load RSS:", err));
+
+// Dragging (Apple Music style)
+const widget = document.getElementById("widget");
+let isDown = false, startX, scrollLeft;
+
+widget.addEventListener("mousedown", e => {
+  isDown = true;
+  widget.style.cursor = "grabbing";
+  startX = e.pageX - widget.offsetLeft;
+  scrollLeft = widget.querySelector("#film-row").scrollLeft;
+});
+
+widget.addEventListener("mouseleave", () => { isDown = false; widget.style.cursor = "grab"; });
+widget.addEventListener("mouseup", () => { isDown = false; widget.style.cursor = "grab"; });
+
+widget.addEventListener("mousemove", e => {
+  if(!isDown) return;
+  e.preventDefault();
+  const x = e.pageX - widget.offsetLeft;
+  const walk = (x - startX) * 1.5;
+  widget.querySelector("#film-row").scrollLeft = scrollLeft - walk;
+});
 </script>
 
 </body>
