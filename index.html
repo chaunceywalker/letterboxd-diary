@@ -18,7 +18,6 @@ body {
 
 .entry {
   display:flex;
-  align-items:center;
   gap:16px;
   padding:14px 0;
   border-bottom:1px solid #2c3440;
@@ -56,31 +55,31 @@ body {
 
 <script>
 const username = "chaunceywalker";
-const rssURL = `https://letterboxd.com/${username}/rss/`;
 
-function stars(rating) {
-  if (!rating) return "";
-  return "★".repeat(Math.round(rating / 2));
-}
-
-fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rssURL)}`)
-  .then(res => res.json())
-  .then(data => {
+fetch(`https://corsproxy.io/?https://letterboxd.com/${username}/films/diary/`)
+  .then(res => res.text())
+  .then(html => {
     const parser = new DOMParser();
-    const xml = parser.parseFromString(data.contents, "text/xml");
-    const items = xml.querySelectorAll("item");
+    const doc = parser.parseFromString(html, "text/html");
+    const rows = doc.querySelectorAll(".diary-entry-row");
 
     const container = document.getElementById("diary");
 
-    items.forEach((item, i) => {
+    rows.forEach((row, i) => {
       if (i >= 20) return;
 
-      const title = item.querySelector("title")?.textContent;
-      const date = item.querySelector("pubDate")?.textContent;
-      const rating = item.querySelector("letterboxd\\:memberRating")?.textContent;
-      const poster = item.querySelector("letterboxd\\:filmPoster")?.textContent;
-      const rewatch = item.querySelector("letterboxd\\:rewatch")?.textContent;
-      const year = item.querySelector("letterboxd\\:filmYear")?.textContent;
+      const poster = row.querySelector(".film-poster img")?.src;
+      const title = row.querySelector(".headline-3 a")?.textContent;
+      const year = row.querySelector(".metadata a")?.textContent;
+      const date = row.querySelector(".td-day a")?.textContent;
+      const ratingClass = row.querySelector(".rating")?.className || "";
+      const rewatch = row.innerHTML.includes("icon-rewatch");
+
+      let stars = "";
+      const match = ratingClass.match(/rated-(\d+)/);
+      if (match) {
+        stars = "★".repeat(parseInt(match[1]) / 2);
+      }
 
       const entry = document.createElement("div");
       entry.className = "entry";
@@ -90,10 +89,10 @@ fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rssURL)}`)
         <div class="details">
           <div class="title">${title} (${year})</div>
           <div class="meta">
-            Watched ${new Date(date).toLocaleDateString('en-US',{month:'short', day:'numeric'})}
-            ${rewatch === "Yes" ? " • Rewatch" : ""}
+            Watched ${date}
+            ${rewatch ? " • Rewatch" : ""}
           </div>
-          <div class="rating">${stars(rating)}</div>
+          <div class="rating">${stars}</div>
         </div>
       `;
 
