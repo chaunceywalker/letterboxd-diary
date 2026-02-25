@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Letterboxd Diary</title>
+
+<style>
+body {
+  margin:0;
+  background:#14181c;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  color:white;
+}
+
+.container {
+  padding:20px;
+}
+
+.entry {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:14px 0;
+  border-bottom:1px solid #2c3440;
+}
+
+.poster {
+  width:70px;
+  border-radius:6px;
+}
+
+.details {
+  flex:1;
+}
+
+.title {
+  font-weight:600;
+}
+
+.meta {
+  font-size:13px;
+  color:#9ab;
+  margin-top:4px;
+}
+
+.rating {
+  color:#00e054;
+  margin-top:6px;
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+<div class="container" id="diary"></div>
+
+<script>
+const username = "chaunceywalker";
+const rssURL = `https://letterboxd.com/${username}/rss/`;
+
+function stars(rating) {
+  if (!rating) return "";
+  return "★".repeat(Math.round(rating / 2));
+}
+
+fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rssURL)}`)
+  .then(res => res.json())
+  .then(data => {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(data.contents, "text/xml");
+    const items = xml.querySelectorAll("item");
+
+    const container = document.getElementById("diary");
+
+    items.forEach((item, i) => {
+      if (i >= 20) return;
+
+      const title = item.querySelector("title")?.textContent;
+      const date = item.querySelector("pubDate")?.textContent;
+      const rating = item.querySelector("letterboxd\\:memberRating")?.textContent;
+      const poster = item.querySelector("letterboxd\\:filmPoster")?.textContent;
+      const rewatch = item.querySelector("letterboxd\\:rewatch")?.textContent;
+      const year = item.querySelector("letterboxd\\:filmYear")?.textContent;
+
+      const entry = document.createElement("div");
+      entry.className = "entry";
+
+      entry.innerHTML = `
+        <img class="poster" src="${poster}">
+        <div class="details">
+          <div class="title">${title} (${year})</div>
+          <div class="meta">
+            Watched ${new Date(date).toLocaleDateString('en-US',{month:'short', day:'numeric'})}
+            ${rewatch === "Yes" ? " • Rewatch" : ""}
+          </div>
+          <div class="rating">${stars(rating)}</div>
+        </div>
+      `;
+
+      container.appendChild(entry);
+    });
+  });
+</script>
+
+</body>
+</html>
